@@ -75,10 +75,15 @@ lexer :: P.TokenParser ()
 lexer = P.makeTokenParser (emptyDef {
     P.commentLine = ";"
   , P.reservedNames = ["A", "B", "C", "X", "Y", "Z", "I", "J",
-                       "SET", "ADD", "SUB", "MUL"]})
+                       "SET", "ADD", "SUB", "MUL", "MLI", "DIV",
+                       "DVI", "MOD", "MDI", "AND", "BOR", "XOR",
+                       "SHR", "ASR", "SHL", "IFB", "IFC", "IFE",
+                       "IFN", "IFG", "IFA", "IFL", "IFU", "ADX",
+                       "SBX", "STI", "STD"]})
 
 whiteSpace = P.whiteSpace lexer
 reserved   = P.reserved lexer
+colon      = P.colon lexer
 
 doParse input = case parse parseProgram "dcpu" input of
   Left err  -> undefined
@@ -112,13 +117,43 @@ parseSpecial = do opcode <- parseSpecialOpcode
 
 parseOpcode :: Parser Opcode
 parseOpcode = try (reserved "SET" >> return SET)
-          <|> (reserved "ADD" >> return ADD)
-          <|> (reserved "SUB" >> return SUB)
-          <|> (reserved "MUL" >> return MUL)
+          <|> try (reserved "ADD" >> return ADD)
+          <|> try (reserved "SUB" >> return SUB)
+          <|> try (reserved "MUL" >> return MUL)
+          <|> try (reserved "MLI" >> return MLI)
+          <|> try (reserved "DIV" >> return DIV)
+          <|> try (reserved "DVI" >> return DVI)
+          <|> try (reserved "MOD" >> return MOD)
+          <|> try (reserved "MDI" >> return MDI)
+          <|> try (reserved "AND" >> return AND)
+          <|> try (reserved "BOR" >> return BOR)
+          <|> try (reserved "XOR" >> return XOR)
+          <|> try (reserved "SHR" >> return SHR)
+          <|> try (reserved "ASR" >> return ASR)
+          <|> try (reserved "SHL" >> return SHL)
+          <|> try (reserved "IFB" >> return IFB)
+          <|> try (reserved "IFC" >> return IFC)
+          <|> try (reserved "IFE" >> return IFE)
+          <|> try (reserved "IFN" >> return IFN)
+          <|> try (reserved "IFG" >> return IFG)
+          <|> try (reserved "IFA" >> return IFA)
+          <|> try (reserved "IFL" >> return IFL)
+          <|> try (reserved "IFU" >> return IFU)
+          <|> try (reserved "ADX" >> return ADX)
+          <|> try (reserved "SBX" >> return SBX)
+          <|> try (reserved "STI" >> return STI)
+          <|> (reserved "STD" >> return STD)
 
 parseSpecialOpcode :: Parser SpOpcode
 parseSpecialOpcode = try (string "JSR" >> return JSR)
-                 <|> (string "INT" >> return INT)
+                 <|> try (string "INT" >> return INT)
+                 <|> try (string "IAG" >> return IAG)
+                 <|> try (string "IAS" >> return IAS)
+                 <|> try (string "RFI" >> return RFI)
+                 <|> try (string "IAQ" >> return IAQ)
+                 <|> try (string "HWN" >> return HWN)
+                 <|> try (string "HWQ" >> return HWQ)
+                 <|> (string "HWI" >> return HWI)
 
 parseOperand :: Parser Operand
 parseOperand = parseRegister
