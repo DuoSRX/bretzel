@@ -1,6 +1,6 @@
 module Main where
 
-import Bretzel.Assembler hiding (main)
+import Bretzel.Assembler
 import Bretzel.Parser
 import Data.Binary
 import Data.Binary.Put
