@@ -1,4 +1,4 @@
-module Parser where
+module Bretzel.Parser where
 
 import Text.ParserCombinators.Parsec hiding (spaces)
 import qualified Text.Parsec.Token as P

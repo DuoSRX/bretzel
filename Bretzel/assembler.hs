@@ -1,4 +1,4 @@
-module DcpuAssembler where
+module Bretzel.Assembler where
 
 import Data.Word
 import Data.Bits
@@ -8,7 +8,7 @@ import Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import Data.List (intercalate)
 import Numeric (readHex, showHex)
-import Parser
+import Bretzel.Parser
 
 instance Binary Instruction where
 	get = undefined
