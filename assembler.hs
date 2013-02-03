@@ -42,7 +42,7 @@ listOfWord16 = do
 dump :: [Word16] -> String
 dump = unwords . map (\x -> showHex x "")
 
-exampleProg = unlines ["ADD A, 0x20", "SHL A, B", "HWI A"] -- "ADD A, B", "SET [0x125], J", "JSR [0x100]", "SET PUSH, X"
+exampleProg = unlines ["SET A, [A+0x10]", "SET A, [A+10]"] -- "ADD A, B", "SET [0x125], J", "JSR [0x100]", "SET PUSH, X"
 
 instructionToWords :: Instruction -> Put
 instructionToWords (Basic opcode op1 op2) = do
@@ -63,6 +63,7 @@ instructionToWords (NonBasic opcode op) = do
 
 -- Instruction are 1-3 words long
 nextWord (RefNum num) = [num]
+nextWord (RegRefNW _ num) = [num]
 nextWord (LitNum num) = if num <= 0x1E then [] else [num]
 nextWord _ = []
 
@@ -79,8 +80,9 @@ regToWord reg = case reg of
 
 operandToWord :: Operand -> Word16
 operandToWord op = case op of
-	(Reg reg) -> regToWord reg
- 	(RegRef regRef) -> regToWord regRef + 0x08
+	(Reg reg)        -> regToWord reg
+ 	(RegRef reg)     -> regToWord reg + 0x08
+ 	(RegRefNW reg _) -> regToWord reg + 0x10
  	PUSH -> 0x18
  	POP  -> 0x18
  	PEEK -> 0x19

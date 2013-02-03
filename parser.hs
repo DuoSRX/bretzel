@@ -51,8 +51,9 @@ data SpOpcode = JSR
 data Register = A | B | C | X | Y | Z | I | J deriving (Show)
 
 data Operand = Reg Register
-             | RegRef Register
-             | RefNum Word16
+             | RegRef Register          -- [register]
+             | RegRefNW Register Word16 -- [register + next word]
+             | RefNum Word16            -- [0x1000]
              | LitNum Word16
              | PUSH
              | POP
@@ -160,7 +161,7 @@ parseOperand = parseRegister
            <|> parseSpecialReg
            <|> parseHexa
            <|> parseNumber
-           <|> (try parseRefNum <|> parseRegRef)
+           <|> (try parseRefNum <|> try parseRegRef <|> try parseRegRefNWHexa <|> parseRegRefNW)
 
 parseRegister :: Parser Operand
 parseRegister = do x <- oneOf "ABCXYZIJ"
@@ -171,6 +172,23 @@ parseRegRef = do char '['
                  x <- oneOf "ABCXYZIJ"
                  char ']'
                  return $ RegRef (charToReg x)
+
+-- refactor this with parseRegRefNW
+parseRegRefNWHexa :: Parser Operand
+parseRegRefNWHexa = do char '['
+                       reg <- oneOf "ABCXYZIJ"
+                       string "+0x"
+                       num <- many1 digit
+                       char ']'
+                       return $ RegRefNW (charToReg reg) (fst . head $ readHex num)
+
+parseRegRefNW :: Parser Operand
+parseRegRefNW = do char '['
+                   reg <- oneOf "ABCXYZIJ"
+                   char '+'
+                   num <- many1 digit
+                   char ']'
+                   return $ RegRefNW (charToReg reg) (read num)
 
 parseRefNum :: Parser Operand
 parseRefNum = do char '['
