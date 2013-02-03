@@ -42,7 +42,7 @@ listOfWord16 = do
 dump :: [Word16] -> String
 dump = unwords . map (\x -> showHex x "")
 
-exampleProg = unlines ["SET [B+10], [A+0x10]"] -- "ADD A, B", "SET [0x125], J", "JSR [0x100]", "SET PUSH, X"
+exampleProg = unlines [":salut SET A, [B+10]", "ADD A, [A+0x10]"] -- "ADD A, B", "SET [0x125], J", "JSR [0x100]", "SET PUSH, X"
 
 instructionToWords :: Instruction -> Put
 instructionToWords (Basic opcode op1 op2) = do

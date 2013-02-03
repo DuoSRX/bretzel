@@ -90,14 +90,21 @@ doParse input = case parse parseProgram "dcpu" input of
   Left err  -> undefined
   Right val -> val
 
-parseProgram :: Parser Program
-parseProgram = do x <- many parseLine
-                  return $ Prog x
+--parseProgram :: Parser Program
+parseProgram = do x <- manyTill parseLine eof
+                  return x
 
-parseLine :: Parser Instruction
-parseLine = do x <- parseInstruction
-               optional $ char '\n'
-               return x
+parseLine :: Parser [Instruction]
+parseLine = do optional whiteSpace
+               lab <- optionMaybe parseLabel
+               whiteSpace
+               instr <- optionMaybe parseInstruction
+               optional whiteSpace
+               return $ case (lab, instr) of
+                 (Just x, Nothing)  -> [Lab x]
+                 (Just x, Just y)   -> [Lab x, y]
+                 (Nothing, Just y)  -> [y]
+                 (_, _)             -> []
 
 parseInstruction :: Parser Instruction
 parseInstruction = try parseBasic <|> parseSpecial
