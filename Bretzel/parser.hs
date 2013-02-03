@@ -55,6 +55,7 @@ data Operand = Reg Register
              | RegRefNW Register Word16 -- [register + next word]
              | RefNum Word16            -- [0x1000]
              | LitNum Word16
+             | Identifier String        -- target label
              | PUSH
              | POP
              | PEEK
@@ -86,6 +87,13 @@ whiteSpace = P.whiteSpace lexer
 reserved   = P.reserved lexer
 colon      = P.colon lexer
 
+instrSize (Basic _ op1 op2) = 1 + opSize op1 + opSize op2
+instrSize (NonBasic _ op)   = 1 + opSize op
+
+opSize (RegRefNW _  _) = 1
+opSize (LitNum num) = if num <= 0x1E then 0 else 1
+opSize _ = 0
+
 doParse input = case parse parseProgram "dcpu" input of
   Left err  -> undefined
   Right val -> val
@@ -95,8 +103,7 @@ parseProgram = do x <- manyTill parseLine eof
                   return x
 
 parseLine :: Parser [Instruction]
-parseLine = do optional whiteSpace
-               lab <- optionMaybe parseLabel
+parseLine = do lab <- optionMaybe parseLabel
                whiteSpace
                instr <- optionMaybe parseInstruction
                optional whiteSpace
@@ -169,6 +176,7 @@ parseOperand = parseRegister
            <|> parseHexa
            <|> parseNumber
            <|> (try parseRefNum <|> try parseRegRef <|> try parseRegRefNWHexa <|> parseRegRefNW)
+           <|> parseIdentifier
 
 parseRegister :: Parser Operand
 parseRegister = do x <- oneOf "ABCXYZIJ"
@@ -223,6 +231,10 @@ parseSpecialReg = try (string "PUSH" >> return PUSH)
               <|> try (string "PEEK" >> return PEEK)
               <|> try (string "POP" >> return POP)
               <|> (string "PICK" >> return PICK) 
+
+parseIdentifier :: Parser Operand
+parseIdentifier = do i <- many1 alphaNum
+                     return $ Identifier i
 
 charToReg r = case r of
     'A' -> A

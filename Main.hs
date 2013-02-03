@@ -8,6 +8,8 @@ import Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import System.Environment
 
+import qualified Data.Map as Map
+
 main = do
 	args <- getArgs
 	file <- readFile (args !! 0)
