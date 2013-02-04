@@ -1,5 +1,6 @@
 module Bretzel.Assembler where
 
+import Control.Monad (when)
 import Data.Word
 import Data.Bits
 import Data.Binary
@@ -20,15 +21,6 @@ instance Binary Program where
 		mapM instructionToWords p
 		return ()
 
-asmTest :: IO ()
-asmTest = do
-	let ast = doParse exampleProg
-	let prog = runPut $ put ast
-
-	BL.writeFile "assembled.bin" prog
-	print . dump $ runGet listOfWord16 prog
-	--input <- BL.readFile "assembled.bin"
-
 listOfWord16 :: Get [Word16]
 listOfWord16 = do
 	empty <- isEmpty
@@ -42,8 +34,6 @@ listOfWord16 = do
 dump :: [Word16] -> String
 dump = unwords . map (\x -> showHex x "")
 
-exampleProg = unlines [":salut ADD A, B", "JSR salut", ":what SET J, [0x1000]", "JSR what"] -- "ADD A, B", "SET [0x125], J", "JSR [0x100]", "SET PUSH, X"
-
 instructionToWords :: Instruction -> Put
 instructionToWords (Basic opcode op1 op2) = do
 	let o = opcodeToWord opcode
@@ -51,15 +41,15 @@ instructionToWords (Basic opcode op1 op2) = do
 	let a = rotateL (operandToWord op2) 10
 	putWord16be (a .|. b .|. o)
 
-	if length (nextWord op2) > 0 then putWord16be (head $ nextWord op2) else return ()
-	if length (nextWord op1) > 0 then putWord16be (head $ nextWord op1) else return ()
+	when (length (nextWord op2) > 0) (putWord16be (head $ nextWord op2))
+	when (length (nextWord op1) > 0) (putWord16be (head $ nextWord op1))
 
 instructionToWords (NonBasic opcode op) = do
 	let o = rotateL (spOpcodeToWord opcode) 5
 	let a = rotateL (operandToWord op) 10
 	putWord16be (a .|. o)
 
-	if length (nextWord op) > 0 then putWord16be (head $ nextWord op) else return ()
+	when (length (nextWord op) > 0) (putWord16be (head $ nextWord op))
 
 -- Instruction are 1-3 words long
 nextWord (RefNum num) = [num]

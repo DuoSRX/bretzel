@@ -8,14 +8,15 @@ import Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import System.Environment
 
-import qualified Data.Map as Map
-
 main = do
-	args <- getArgs
-	file <- readFile (args !! 0)
+	--args <- getArgs
+	--file <- readFile (args !! 0)
+
+	exampleProg <- readFile "test.dasm16"
 
 	let ast = doParse exampleProg
-	let prog = runPut $ put ast
+	mapM (putStrLn . show) ast
+	let prog = runPut $ put (Prog ast)
 
 	BL.writeFile "assembled.bin" prog
 	print . dump $ runGet listOfWord16 prog

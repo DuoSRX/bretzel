@@ -96,13 +96,13 @@ opSize (RegRefNW _  _) = 1
 opSize (RefNum _) = 1
 opSize (LitNum num) = if num <= 0x1E then 0 else 1
 opSize _ = 0
-
+                 
+doParse :: String -> [Instruction]
 doParse input = case parse parseProgram "dcpu" input of
   Left err  -> undefined
   Right val -> do
-    let ast = concat val
-    let labels = (registerLabels ast 0 Map.empty) -- create a map with the label
-    return $ removeLabels $ map (replaceLabels labels) ast -- replace the label with the addresses
+    let labels = (registerLabels (concat val) 0 Map.empty) -- create a map with the labels
+    removeLabels $ map (replaceLabels labels) (concat val) -- replace the labels with the addresses
 
 registerLabels :: [Instruction] -> Word16 -> Map.Map String Word16 -> Map.Map String Word16
 registerLabels [] _ m = m
