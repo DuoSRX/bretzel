@@ -83,7 +83,9 @@ lexer = P.makeTokenParser (emptyDef {
                        "DVI", "MOD", "MDI", "AND", "BOR", "XOR",
                        "SHR", "ASR", "SHL", "IFB", "IFC", "IFE",
                        "IFN", "IFG", "IFA", "IFL", "IFU", "ADX",
-                       "SBX", "STI", "STD"]})
+                       "SBX", "STI", "STD",
+                       "INT", "IAG", "IAS", "RFI", "IAQ", "HWN",
+                       "HWQ", "HWI"]})
 
 whiteSpace = P.whiteSpace lexer
 reserved   = P.reserved lexer
@@ -131,7 +133,8 @@ parseProgram = do x <- manyTill parseLine eof
                   return x
 
 parseLine :: Parser [Instruction]
-parseLine = do lab <- optionMaybe parseLabel
+parseLine = do optional whiteSpace
+               lab <- optionMaybe parseLabel
                whiteSpace
                instr <- optionMaybe parseInstruction
                optional whiteSpace
@@ -148,13 +151,12 @@ parseBasic :: Parser Instruction
 parseBasic = do opcode <- parseOpcode
                 whiteSpace
                 op1 <- parseOperand
-                whiteSpace >> char ',' >> whiteSpace
+                char ','
                 op2 <- parseOperand
                 return $ Basic opcode op1 op2
 
 parseSpecial :: Parser Instruction
 parseSpecial = do opcode <- parseSpecialOpcode
-                  whiteSpace
                   op <- parseOperand
                   return $ NonBasic opcode op
 
@@ -188,15 +190,15 @@ parseOpcode = try (reserved "SET" >> return SET)
           <|> (reserved "STD" >> return STD)
 
 parseSpecialOpcode :: Parser SpOpcode
-parseSpecialOpcode = try (string "JSR" >> return JSR)
-                 <|> try (string "INT" >> return INT)
-                 <|> try (string "IAG" >> return IAG)
-                 <|> try (string "IAS" >> return IAS)
-                 <|> try (string "RFI" >> return RFI)
-                 <|> try (string "IAQ" >> return IAQ)
-                 <|> try (string "HWN" >> return HWN)
-                 <|> try (string "HWQ" >> return HWQ)
-                 <|> (string "HWI" >> return HWI)
+parseSpecialOpcode = try (reserved "JSR" >> return JSR)
+                 <|> try (reserved "INT" >> return INT)
+                 <|> try (reserved "IAG" >> return IAG)
+                 <|> try (reserved "IAS" >> return IAS)
+                 <|> try (reserved "RFI" >> return RFI)
+                 <|> try (reserved "IAQ" >> return IAQ)
+                 <|> try (reserved "HWN" >> return HWN)
+                 <|> try (reserved "HWQ" >> return HWQ)
+                 <|> (reserved "HWI" >> return HWI)
 
 parseOperand :: Parser Operand
 parseOperand = parseRegister
