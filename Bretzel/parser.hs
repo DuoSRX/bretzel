@@ -7,6 +7,8 @@ import System.Environment
 import Control.Monad
 import Numeric (readHex)
 import Data.Word (Word16)
+import qualified Data.Map as Map
+import Data.Maybe
 
 data Opcode = SET
             | ADD
@@ -91,12 +93,38 @@ instrSize (Basic _ op1 op2) = 1 + opSize op1 + opSize op2
 instrSize (NonBasic _ op)   = 1 + opSize op
 
 opSize (RegRefNW _  _) = 1
+opSize (RefNum _) = 1
 opSize (LitNum num) = if num <= 0x1E then 0 else 1
 opSize _ = 0
 
 doParse input = case parse parseProgram "dcpu" input of
   Left err  -> undefined
-  Right val -> val
+  Right val -> do
+    let ast = concat val
+    let labels = (registerLabels ast 0 Map.empty) -- create a map with the label
+    return $ removeLabels $ map (replaceLabels labels) ast -- replace the label with the addresses
+
+registerLabels :: [Instruction] -> Word16 -> Map.Map String Word16 -> Map.Map String Word16
+registerLabels [] _ m = m
+registerLabels ((Lab (Label l)):xs) i m = registerLabels xs i (Map.insert l i m)
+registerLabels (x:xs) i m = registerLabels xs (i + (instrSize x)) m
+
+replaceLabels :: Map.Map String Word16 -> Instruction -> Instruction
+replaceLabels m (Basic op (Identifier op1) (Identifier op2)) = Basic op (findLabel op1 m) (findLabel op2 m) 
+replaceLabels m (Basic op (Identifier op1) op2)  = Basic op (findLabel op1 m) op2
+replaceLabels m (Basic op op1 (Identifier op2)) = Basic op op1 (findLabel op2 m)
+replaceLabels m (NonBasic op (Identifier op1)) = NonBasic op (findLabel op1 m)
+replaceLabels _ x = x
+
+findLabel :: String -> Map.Map String Word16 -> Operand
+findLabel instr m = case Map.lookup instr m of
+  (Just x) -> LitNum x
+  Nothing  -> error "invalid label"
+
+removeLabels :: [Instruction] -> [Instruction]
+removeLabels = filter (not . isLabel)
+  where isLabel (Lab _) = True
+        isLabel _ = False
 
 --parseProgram :: Parser Program
 parseProgram = do x <- manyTill parseLine eof
