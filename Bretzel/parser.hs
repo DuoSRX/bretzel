@@ -9,6 +9,7 @@ import Numeric (readHex)
 import Data.Word (Word16)
 import qualified Data.Map as Map
 import Data.Maybe
+import Debug.Trace
 
 data Opcode = SET
             | ADD
@@ -85,11 +86,15 @@ lexer = P.makeTokenParser (emptyDef {
                        "IFN", "IFG", "IFA", "IFL", "IFU", "ADX",
                        "SBX", "STI", "STD",
                        "INT", "IAG", "IAS", "RFI", "IAQ", "HWN",
-                       "HWQ", "HWI"]})
+                       "HWQ", "HWI",
+                       "PUSH", "POP", "PEEK", "PICK",
+                       "SP", "PC", "EX"]})
 
 whiteSpace = P.whiteSpace lexer
 reserved   = P.reserved lexer
 colon      = P.colon lexer
+natural    = P.natural lexer
+identifier = P.identifier lexer
 
 instrSize (Basic _ op1 op2) = 1 + opSize op1 + opSize op2
 instrSize (NonBasic _ op)   = 1 + opSize op
@@ -101,7 +106,7 @@ opSize _ = 0
                  
 doParse :: String -> [Instruction]
 doParse input = case parse parseProgram "dcpu" input of
-  Left err  -> undefined
+  Left err  -> trace (show err) []
   Right val -> do
     let labels = (registerLabels (concat val) 0 Map.empty) -- create a map with the labels
     removeLabels $ map (replaceLabels labels) (concat val) -- replace the labels with the addresses
@@ -129,8 +134,7 @@ removeLabels = filter (not . isLabel)
         isLabel _ = False
 
 --parseProgram :: Parser Program
-parseProgram = do x <- manyTill parseLine eof
-                  return x
+parseProgram = manyTill parseLine eof
 
 parseLine :: Parser [Instruction]
 parseLine = do optional whiteSpace
@@ -145,13 +149,15 @@ parseLine = do optional whiteSpace
                  (_, _)             -> []
 
 parseInstruction :: Parser Instruction
-parseInstruction = try parseBasic <|> parseSpecial
+parseInstruction = parseBasic <|> parseSpecial
 
 parseBasic :: Parser Instruction
 parseBasic = do opcode <- parseOpcode
                 whiteSpace
                 op1 <- parseOperand
+                optional whiteSpace
                 char ','
+                optional whiteSpace
                 op2 <- parseOperand
                 return $ Basic opcode op1 op2
 
@@ -203,68 +209,67 @@ parseSpecialOpcode = try (reserved "JSR" >> return JSR)
 parseOperand :: Parser Operand
 parseOperand = parseRegister
            <|> parseSpecialReg
-           <|> parseHexa
-           <|> parseNumber
+           <|> parseNumber           
            <|> (try parseRefNum <|> try parseRegRef <|> try parseRegRefNWHexa <|> parseRegRefNW)
            <|> parseIdentifier
 
 parseRegister :: Parser Operand
-parseRegister = do x <- oneOf "ABCXYZIJ"
-                   return $ Reg (charToReg x)
+parseRegister = do x <- register
+                   return $ Reg x
+
+parseSpecialReg :: Parser Operand
+parseSpecialReg = try (reserved "PUSH" >> return PUSH)
+              <|> try (reserved "PEEK" >> return PEEK)
+              <|> try (reserved "POP" >> return POP)
+              <|> (reserved "PICK" >> return PICK)
 
 parseRegRef :: Parser Operand
 parseRegRef = do char '['
-                 x <- oneOf "ABCXYZIJ"
+                 x <- register
                  char ']'
-                 return $ RegRef (charToReg x)
+                 return $ RegRef x
 
 -- refactor this with parseRegRefNW
 parseRegRefNWHexa :: Parser Operand
 parseRegRefNWHexa = do char '['
-                       reg <- oneOf "ABCXYZIJ"
-                       string "+0x"
-                       num <- many1 digit
+                       reg <- register
+                       char '+'
+                       num <- natural
                        char ']'
-                       return $ RegRefNW (charToReg reg) (fst . head $ readHex num)
+                       return $ RegRefNW reg (fromIntegral num)
 
 parseRegRefNW :: Parser Operand
 parseRegRefNW = do char '['
-                   reg <- oneOf "ABCXYZIJ"
+                   reg <- register
                    char '+'
-                   num <- many1 digit
+                   num <- natural
                    char ']'
-                   return $ RegRefNW (charToReg reg) (read num)
+                   return $ RegRefNW reg (fromIntegral num)
 
 parseRefNum :: Parser Operand
 parseRefNum = do char '['
-                 string "0x"
-                 x <- many1 digit
+                 x <- natural
                  char ']'
-                 return $ RefNum (fst . head $ readHex x)
-
-parseHexa :: Parser Operand
-parseHexa = do string "0x"
-               x <- many1 digit
-               return $ LitNum (fst . head $ readHex x)
+                 return $ RefNum (fromIntegral x)
 
 parseNumber :: Parser Operand
-parseNumber = do x <- many1 digit
-                 return $ LitNum (read x)
+parseNumber = do x <- natural
+                 return $ LitNum (fromIntegral x)
 
 parseLabel :: Parser Label
 parseLabel = do colon
-                x <- many1 alphaNum
+                x <- identifier
                 return $ Label x
-
-parseSpecialReg :: Parser Operand
-parseSpecialReg = try (string "PUSH" >> return PUSH)
-              <|> try (string "PEEK" >> return PEEK)
-              <|> try (string "POP" >> return POP)
-              <|> (string "PICK" >> return PICK) 
 
 parseIdentifier :: Parser Operand
 parseIdentifier = do i <- many1 alphaNum
                      return $ Identifier i
+
+register :: Parser Register
+register = do whiteSpace
+              x <- oneOf "ABCXYZIJ"
+              whiteSpace
+              return $ charToReg x
 
 charToReg r = case r of
     'A' -> A
