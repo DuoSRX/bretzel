@@ -53,6 +53,22 @@ makeCPU = do
 		, cycles = cycles'
 	}
 
+readMem :: CPU -> Word16 -> IO Word16
+readMem cpu addr = do
+	val <- readArray (ram cpu) addr
+	return val
+
+writeMem :: CPU -> Word16 -> Word16 -> IO ()
+writeMem cpu addr val = do
+	writeArray (ram cpu) addr val
+	return ()
+
+modifyMem :: CPU -> Word16 -> (Word16 -> Word16) -> IO ()
+modifyMem cpu addr f = do
+	val <- readMem cpu addr
+	writeMem cpu addr (f val)
+	return ()
+
 loadValue :: CPU -> Operand -> IO Word16
 loadValue cpu op = case op of
 	Reg A -> readIORef (ar cpu)
@@ -66,6 +82,14 @@ loadValue cpu op = case op of
 	SP -> readIORef (sp cpu)
 	PC -> readIORef (pc cpu)
 	LitNum n -> return n
+	RegRef r -> do
+		addr <- loadValue cpu (Reg r)
+		res <- readMem cpu addr
+		return res
+	RefNum n -> do
+		addr <- loadValue cpu (LitNum n)
+		res <- readMem cpu addr
+		return res
 
 getReg :: CPU -> Operand -> IORef Word16
 getReg cpu (Reg A) = (ar cpu)
@@ -84,11 +108,15 @@ getValue cpu r@(Reg _) = getReg cpu r
 getValue cpu SP = getReg cpu SP
 getValue cpu PC = getReg cpu PC
 
+modify :: CPU -> Operand -> (Word16 -> Word16) -> IO ()
+modify cpu r@(Reg _) f = modifyIORef (getValue cpu r) f
+modify cpu (RefNum n) f = modifyMem cpu n f
+
 exec :: CPU -> Instruction -> IO ()
-exec cpu (Basic SET a b) = loadValue cpu b >>= writeIORef (getValue cpu a)
-exec cpu (Basic ADD a b) = loadValue cpu b >>= \x -> modifyIORef (getValue cpu a) (+x)
-exec cpu (Basic SUB a b) = loadValue cpu b >>= \x -> modifyIORef (getValue cpu a) (subtract x)
-exec cpu (Basic MUL a b) = loadValue cpu b >>= \x -> modifyIORef (getValue cpu a) (*x)
+exec cpu (Basic SET a b) = loadValue cpu b >>= \x -> modify cpu a (\a -> x)
+exec cpu (Basic ADD a b) = loadValue cpu b >>= \x -> modify cpu a (+x)
+exec cpu (Basic SUB a b) = loadValue cpu b >>= \x -> modify cpu a (subtract x)
+exec cpu (Basic MUL a b) = loadValue cpu b >>= \x -> modify cpu a (*x)
 
 run :: CPU -> [Instruction] -> IO ()
 run cpu instructions = mapM_ (exec cpu) instructions
@@ -97,11 +125,14 @@ emu :: IO ()
 emu = do
 	cpu <- makeCPU
 	writeIORef (ar cpu) 2
+	writeArray (ram cpu) 2 100
 
-	let instr = [Basic SET (Reg B) (Reg A),
+	let instr = [Basic SET (RefNum 2) (LitNum 10),
+				 Basic SET (Reg B) (Reg A),
 				 Basic ADD (Reg B) (LitNum 10),
 				 Basic MUL (Reg B) (Reg A),
-				 Basic SUB (Reg B) (LitNum 1)]
+				 Basic SUB (Reg B) (LitNum 1),
+				 Basic ADD (Reg B) (RefNum 2)]
 
 	run cpu instr
 
