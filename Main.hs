@@ -2,6 +2,7 @@ module Main where
 
 import Bretzel.Assembler
 import Bretzel.Parser
+import Bretzel.Emulator
 import Data.Binary
 import Data.Binary.Put
 import Data.Binary.Get

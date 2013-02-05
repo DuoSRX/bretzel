@@ -9,6 +9,7 @@ import Data.Binary.Get
 import qualified Data.ByteString.Lazy as BL
 import Data.List (intercalate)
 import Numeric (readHex, showHex)
+import Text.Printf (printf)
 import Bretzel.Parser
 
 instance Binary Instruction where
@@ -32,7 +33,7 @@ listOfWord16 = do
 			return (w:rest)
 
 dump :: [Word16] -> String
-dump = unwords . map (\x -> showHex x "")
+dump = unwords . map (printf "%04x")
 
 instructionToWords :: Instruction -> Put
 instructionToWords (Basic opcode op1 op2) = do
