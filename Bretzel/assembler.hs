@@ -84,6 +84,29 @@ operandToWord op = case op of
  	(RefNum num) -> 0x1E
  	(LitNum num) -> if num <= 0x1E then (fromIntegral num + 0x21) else 0x1F
 
+wordToOperand :: Word16 -> Operand
+wordToOperand op = case op of
+	0x00 -> Reg A
+	0x01 -> Reg B
+	0x02 -> Reg C
+	0x03 -> Reg X	
+	0x04 -> Reg Y
+	0x05 -> Reg Z
+	0x06 -> Reg I
+	0x07 -> Reg J
+	0x08 -> RegRef A
+	0x09 -> RegRef B
+	0x0A -> RegRef C
+	0x0B -> RegRef X
+	0x0C -> RegRef Y
+	0x0D -> RegRef Z
+	0x0E -> RegRef I
+	0x0F -> RegRef J
+	0x1A -> PICK
+	0x1B -> SP
+	0x1C -> PC
+	0x1D -> EX
+
 opcodeToWord :: Opcode -> Word16
 opcodeToWord op = case op of
 	SET -> 0x01
@@ -114,6 +137,36 @@ opcodeToWord op = case op of
 	STI -> 0x1E
 	STD -> 0x1F
 
+wordToOpcode :: Word16 -> Opcode
+wordToOpcode op = case op of
+	0x01 -> SET
+	0x02 -> ADD
+	0x03 -> SUB
+	0x04 -> MUL
+	0x05 -> MLI
+	0x06 -> DIV
+	0x07 -> DVI
+	0x08 -> MOD
+	0x09 -> MDI
+	0x0A -> AND
+	0x0B -> BOR
+	0x0C -> XOR
+	0x0D -> SHR
+	0x0E -> ASR
+	0x0F -> SHL
+	0x10 -> IFB
+	0x11 -> IFC
+	0x12 -> IFE
+	0x13 -> IFN
+	0x14 -> IFG
+	0x15 -> IFA
+	0x16 -> IFL
+	0x17 -> IFU
+	0x1A -> ADX
+	0x1B -> SBX
+	0x1E -> STI
+	0x1F -> STD
+
 spOpcodeToWord :: SpOpcode -> Word16
 spOpcodeToWord op = case op of
 	JSR -> 0x01
@@ -125,3 +178,40 @@ spOpcodeToWord op = case op of
 	HWN -> 0x10
 	HWQ -> 0x11
 	HWI -> 0x12
+
+wordToSpOpcode :: Word16 -> SpOpcode
+wordToSpOpcode op = case op of
+	0x01 -> JSR
+	0x08 -> INT
+	0x09 -> IAG
+	0x0A -> IAS
+	0x0B -> RFI
+	0x0C -> IAQ
+	0x10 -> HWN
+	0x11 -> HWQ
+	0x12 -> HWI
+
+decodeInstruction :: Word16 -> Instruction
+decodeInstruction instr = do
+	let o = instr .&. 0x1F
+	let a = (shiftR instr 5) .&. 0x1F
+	let b = (shiftR instr 10) .&. 0x3F
+	let a' = decodeOperand a
+	let b' = decodeOperand b
+
+	case o of
+		-- non basic
+		0x0 -> case a of
+			0x01 -> NonBasic JSR b'
+
+		-- basic
+		0x01 -> Basic SET a' b'
+
+decodeOperand :: Word16 -> Operand
+decodeOperand op
+	| op <= 0x07 = Reg A
+	| op <= 0x0F = RegRef A
+	| op <= 0x17 = RegRefNW A 0x10
+	| op >= 0x20 = LitNum (op - 0x20)
+	| otherwise = case op of
+		0x1B -> PUSH
