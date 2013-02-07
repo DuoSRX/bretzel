@@ -119,14 +119,13 @@ getValue cpu EX = getReg cpu EX
 modify :: CPU -> Operand -> (Word16 -> Word16) -> IO ()
 modify cpu r@(Reg _) f = modifyIORef (getValue cpu r) f
 modify cpu (RefNum n) f = modifyMem cpu n f
---modify cpu EX f = writeIORef (ex cpu) . f
 
 write :: CPU -> Operand -> Word16 -> IO ()
 write cpu r@(Reg _) value = writeIORef (getValue cpu r) value
 write cpu EX value = writeIORef (ex cpu) value
 
 exec :: CPU -> Instruction -> IO ()
-exec cpu (Basic SET a b) = loadValue cpu b >>= \x -> modify cpu a (\a -> x)
+exec cpu (Basic SET a b) = loadValue cpu b >>= write cpu a
 
 exec cpu (Basic ADD b a) = do
 	x <- loadValue cpu a
@@ -153,6 +152,21 @@ exec cpu (Basic MUL b a) = do
 	if y == 0 then write cpu EX 0x0
 		      else write cpu EX $ fromIntegral overflow
 
+exec cpu (Basic AND b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b (y .&. x)
+
+exec cpu (Basic BOR b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b (y .|. x)
+
+exec cpu (Basic XOR b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b (xor y x)
+
 run :: CPU -> [Instruction] -> IO ()
 run cpu instructions = mapM_ (exec cpu) instructions
 
@@ -161,9 +175,9 @@ emu = do
 	cpu <- makeCPU
 	writeArray (ram cpu) 2 100
 
-	let instr = [Basic SET (Reg A) (LitNum 0xFFFF),
+	let instr = [Basic SET (Reg A) (LitNum 1),
 				 Basic SET (Reg B) (LitNum 2),
-				 Basic MUL (Reg A) (Reg B)]
+				 Basic XOR (Reg A) (Reg B)]
 
 	run cpu instr
 
@@ -171,5 +185,5 @@ emu = do
 	print a
 	b <- readIORef (br cpu)
 	print b
-	ex <- readIORef (ex cpu)
-	print ex
+	--ex <- readIORef (ex cpu)
+	--print ex
