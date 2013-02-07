@@ -167,6 +167,20 @@ exec cpu (Basic XOR b a) = do
 	y <- loadValue cpu b
 	write cpu b (xor y x)
 
+exec cpu (Basic STI b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b x
+	modify cpu (Reg I) (+1)
+	modify cpu (Reg J) (+1)
+
+exec cpu (Basic STD b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b x
+	modify cpu (Reg I) (subtract 1)
+	modify cpu (Reg J) (subtract 1)
+
 run :: CPU -> [Instruction] -> IO ()
 run cpu instructions = mapM_ (exec cpu) instructions
 
