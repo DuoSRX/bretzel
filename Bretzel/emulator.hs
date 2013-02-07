@@ -146,11 +146,28 @@ exec cpu (Basic SUB b a) = do
 exec cpu (Basic MUL b a) = do
 	x <- loadValue cpu a
 	y <- loadValue cpu b
-	let res = x * y
-	write cpu b res
+	write cpu b (x * y)
 	let overflow = (shiftR (fromIntegral y * fromIntegral x) 16) .&. 0xFFFF :: Word
 	if y == 0 then write cpu EX 0x0
 		      else write cpu EX $ fromIntegral overflow
+
+exec cpu (Basic DIV b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	if x == 0
+		then do
+			write cpu b 0x0
+			write cpu EX 0x0
+    	else do
+    		let overflow = ((shiftL (fromIntegral x) 16) `div` (fromIntegral y)) .&. 0xFFFF :: Word
+    		write cpu b (y `div` x)
+    		write cpu EX $ fromIntegral overflow
+
+exec cpu (Basic MOD b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	if x == 0 then write cpu b 0
+		      else write cpu b $ (fromIntegral y) `mod` (fromIntegral x)
 
 exec cpu (Basic AND b a) = do
 	x <- loadValue cpu a
@@ -189,9 +206,9 @@ emu = do
 	cpu <- makeCPU
 	writeArray (ram cpu) 2 100
 
-	let instr = [Basic SET (Reg A) (LitNum 1),
-				 Basic SET (Reg B) (LitNum 2),
-				 Basic XOR (Reg A) (Reg B)]
+	let instr = [Basic SET (Reg A) (LitNum 0x18),
+				 Basic SET (Reg B) (LitNum 0x4),
+				 Basic DIV (Reg A) (Reg B)]
 
 	run cpu instr
 
@@ -199,5 +216,3 @@ emu = do
 	print a
 	b <- readIORef (br cpu)
 	print b
-	--ex <- readIORef (ex cpu)
-	--print ex
