@@ -6,12 +6,15 @@ import Bretzel.Assembler
 import Control.Monad
 import Data.Array.IO
 import Data.IORef
-import Data.Word (Word16)
+import Data.Word (Word16, Word)
+import Data.Bits
+import Debug.Trace
 
 data CPU = CPU {
 	ram :: IOArray Word16 Word16
   , pc :: IORef Word16 -- PC
   , sp :: IORef Word16 -- SP
+  , ex :: IORef Word16 -- EX
   , ar :: IORef Word16 -- A
   , br :: IORef Word16 -- B
   , cr :: IORef Word16 -- C
@@ -28,6 +31,7 @@ makeCPU = do
 	mem <- newArray(0, 10000) 0
 	pc' <- newIORef 0
 	sp' <- newIORef 0xFFFF
+	ex' <- newIORef 0
 	ar' <- newIORef 0
 	br' <- newIORef 0
 	cr' <- newIORef 0
@@ -42,6 +46,7 @@ makeCPU = do
 		  ram = mem
 		, pc = pc'
 		, sp = sp'
+		, ex = ex'
 		, ar = ar'
 		, br = br'
 		, cr = br'
@@ -81,6 +86,7 @@ loadValue cpu op = case op of
 	Reg J -> readIORef (jr cpu)
 	SP -> readIORef (sp cpu)
 	PC -> readIORef (pc cpu)
+	EX -> readIORef (ex cpu)
 	LitNum n -> return n
 	RegRef r -> do
 		addr <- loadValue cpu (Reg r)
@@ -102,21 +108,50 @@ getReg cpu (Reg I) = (ir cpu)
 getReg cpu (Reg J) = (jr cpu)
 getReg cpu SP = (sp cpu)
 getReg cpu PC = (pc cpu)
+getReg cpu EX = (pc cpu)
 
 getValue :: CPU -> Operand -> IORef Word16
 getValue cpu r@(Reg _) = getReg cpu r
 getValue cpu SP = getReg cpu SP
 getValue cpu PC = getReg cpu PC
+getValue cpu EX = getReg cpu EX
 
 modify :: CPU -> Operand -> (Word16 -> Word16) -> IO ()
 modify cpu r@(Reg _) f = modifyIORef (getValue cpu r) f
 modify cpu (RefNum n) f = modifyMem cpu n f
+--modify cpu EX f = writeIORef (ex cpu) . f
+
+write :: CPU -> Operand -> Word16 -> IO ()
+write cpu r@(Reg _) value = writeIORef (getValue cpu r) value
+write cpu EX value = writeIORef (ex cpu) value
 
 exec :: CPU -> Instruction -> IO ()
 exec cpu (Basic SET a b) = loadValue cpu b >>= \x -> modify cpu a (\a -> x)
-exec cpu (Basic ADD a b) = loadValue cpu b >>= \x -> modify cpu a (+x)
-exec cpu (Basic SUB a b) = loadValue cpu b >>= \x -> modify cpu a (subtract x)
-exec cpu (Basic MUL a b) = loadValue cpu b >>= \x -> modify cpu a (*x)
+
+exec cpu (Basic ADD b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b (x + y)
+	let overflow = (fromIntegral x + fromIntegral y) > (0xFFFF :: Int)
+	if overflow then write cpu EX 0x1
+			    else write cpu EX 0x0
+
+exec cpu (Basic SUB b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	write cpu b (y - x)
+	let underflow = (fromIntegral y - fromIntegral x) < (0 :: Int)
+	if underflow then write cpu EX 0xFFFF
+		         else write cpu EX 0x0
+
+exec cpu (Basic MUL b a) = do
+	x <- loadValue cpu a
+	y <- loadValue cpu b
+	let res = x * y
+	write cpu b res
+	let overflow = (shiftR (fromIntegral y * fromIntegral x) 16) .&. 0xFFFF :: Word
+	if y == 0 then write cpu EX 0x0
+		      else write cpu EX $ fromIntegral overflow
 
 run :: CPU -> [Instruction] -> IO ()
 run cpu instructions = mapM_ (exec cpu) instructions
@@ -124,18 +159,17 @@ run cpu instructions = mapM_ (exec cpu) instructions
 emu :: IO ()
 emu = do
 	cpu <- makeCPU
-	writeIORef (ar cpu) 2
 	writeArray (ram cpu) 2 100
 
-	let instr = [Basic SET (RefNum 2) (LitNum 10),
-				 Basic SET (Reg B) (Reg A),
-				 Basic ADD (Reg B) (LitNum 10),
-				 Basic MUL (Reg B) (Reg A),
-				 Basic SUB (Reg B) (LitNum 1),
-				 Basic ADD (Reg B) (RefNum 2)]
+	let instr = [Basic SET (Reg A) (LitNum 0xFFFF),
+				 Basic SET (Reg B) (LitNum 2),
+				 Basic MUL (Reg A) (Reg B)]
 
 	run cpu instr
 
-	w <- readIORef (br cpu)
-
-	print w
+	a <- readIORef (ar cpu)
+	print a
+	b <- readIORef (br cpu)
+	print b
+	ex <- readIORef (ex cpu)
+	print ex
